@@ -1,3 +1,6 @@
+import robin_stocks.robinhood as rh
+import pyotp
+
 from UserProfile import UserProfile
 
 class AppSession:
@@ -12,15 +15,56 @@ class AppSession:
             raise FileNotFoundError(f"Couldn't find the following config file: {config}")
     
     def start_session(self):
-        self.user_prof = UserProfile(self.config['creds_file'])
-        self.session = self.user_prof.login()
+        self.session = self.__login()
+        profile_info = self.__load_user_info()
+        self.user_prof = UserProfile(profile_info)
 
     def end_session(self):
-        try:
-            self.user_prof.logout()
-            self.session = None
-        except Exception as e:
-            raise e("Error logging out of our user session")
+        self.__logout()
+        self.session = None
 
+    def __login(self):
+        try: # try getting token and using it otherwise do login
+            lines = open(self.creds).read().splitlines()
+            KEY = lines[0]
+            EMAIL = lines[1]
+            PASSWD = lines[2]
+            CODE = pyotp.TOTP(KEY).now()
+            session = rh.login(EMAIL, PASSWD, mfa_code=CODE)
+        except Exception as e:
+            raise Exception(f"Got the following error {e}")
+        finally:
+            self.load_user_info()
+            return session
+
+    def __load_user_info(self):
+        try:
+            profile = rh.load_account_profile()
+            return profile
+        except Exception as e:
+            raise Exception(f"Got the following error when attempting to load the user info: {e}")
+
+    def __logout(self):
+        try:
+            rh.logout()
+        except Exception as e:
+            raise Exception(f"Got the following error after attempting to logout the user session: {e}")
+
+    def validate_session(self, func):
+        """
+        Wrapper function that validates user session before invoking robin stocks API
+        """
+        def wrapper(*args, **kwargs):
+            try:
+                rh.load_basic_profile()
+                func(*args, **kwargs)
+            except Exception as e:
+                self.start_session()
+                func(*args, **kwargs)
+
+        return wrapper
+    
+    @validate_session
     def activate_session(self):
         pass
+    

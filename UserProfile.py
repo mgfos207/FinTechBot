@@ -1,28 +1,17 @@
-import robin_stocks.robinhood as rh
-import pyotp
+from  dataclasses import dataclass
 
+@dataclass
 class UserProfile:
-    def __init__(self, creds_file):
-        self.creds_life = creds_file
-        self.profile = None
+    _profile: dict
 
-    def login(self):
-        try: # try getting token and using it otherwise do login
-            lines = open(self.creds).read().splitlines()
-            KEY = lines[0]
-            EMAIL = lines[1]
-            PASSWD = lines[2]
-            CODE = pyotp.TOTP(KEY).now()
-            session = rh.login(EMAIL, PASSWD, mfa_code=CODE)
-        except Exception as e:
-            raise Exception(f"Got the following error {e}")
-        finally:
-            self.load_user_info()
-            return session
+    @property
+    def user_profile(self) -> dict:
+        return self._profile
 
-    def load_user_info(self):
-        self.profile = rh.load_account_profile()
-        print(self.profile)
+    @user_profile.setter
+    def user_profile(self, updated_profile: dict) -> None:
+        self._profile = updated_profile
 
-    def logout(self):
-        rh.logout()
+    @property
+    def user_cash(self) -> str:
+        return self._profile['cash']
